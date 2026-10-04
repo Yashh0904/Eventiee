@@ -8,7 +8,7 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
   const accessToken = req.headers.authorization?.split(" ")[1];
 
   if(!accessToken) {
-    return res.send(401).json({
+    return res.status(401).json({
       accessTokenPresent: false
     })
   }
@@ -19,7 +19,7 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
     const [ user ] = await db
       .select()
       .from(userSchema)
-      .where(eq(userSchema.id, decodedUser.id))
+      .where(eq(userSchema.id, decodedUser.userId))
 
     if(!user) {
       return res.status(401).json({
@@ -36,5 +36,18 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
     return res.status(401).json({
         message: "Invalid or expired token"
     });
+  }
+}
+
+export const requireRole = (allowedRole: 'ORGANIZER' | 'ATTENDEE') => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if(!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if(req.user.role !== allowedRole) {
+      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+    }
+
+    next();
   }
 }

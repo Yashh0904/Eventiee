@@ -1,15 +1,14 @@
 import express from "express"
-import { tokenRefreshController, userLoginController, userRegistrationController, tokenLogoutController } from "../controllers/auth.controller.js";
-import { authMiddleWare } from "../middlewares/auth.middleware.js";
+import { tokenRefresh, userLogin, userLogout, userRegistration } from "../controllers/auth.controller.js";
 
 const authRouter = express.Router();
 
-authRouter.post('/register', userRegistrationController);
+authRouter.post('/register', userRegistration);
 
-authRouter.post('/login', userLoginController);
+authRouter.post('/login', userLogin);
 
-authRouter.post('/refresh', tokenRefreshController);
+authRouter.post('/refresh', tokenRefresh);
 
-authRouter.post('/logout', tokenLogoutController);
+authRouter.post('/logout', userLogout);
 
 export default authRouter;

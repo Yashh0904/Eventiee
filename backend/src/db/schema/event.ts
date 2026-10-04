@@ -1,4 +1,4 @@
-import { pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { userSchema } from "./user.js";
 
 export const eventSchema = pgTable("event", {
@@ -12,6 +12,9 @@ export const eventSchema = pgTable("event", {
     }),
   name: varchar("name", { length: 255 })
     .notNull(),
+  venue: varchar("venue", { length: 255 })
+    .notNull(),
+  description: text('description').notNull(),
   dateTime: timestamp("date_time", { withTimezone: true })
     .notNull(),
   bannerUrl: varchar("banner_url", { length: 255 }),

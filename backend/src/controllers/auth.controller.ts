@@ -8,15 +8,13 @@ import { refreshTokenSchema, userSchema } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { createAccessToken, createRefreshToken } from "../services/authTokens.service.js";
 
-export const userRegistrationController = async (req: Request, res: Response) => {
+export const userRegistration = async (req: Request, res: Response) => {
   try{
-    const body = req.body;
-
-    const result = userRegistrationSchema.safeParse(body);
+     const result = userRegistrationSchema.safeParse(req.body);
 
     if(result.error) {
       return res.status(400).json({
-        message: z.flattenError(result.error).fieldErrors
+        errors: z.flattenError(result.error).fieldErrors
       })
     }
 
@@ -90,15 +88,13 @@ export const userRegistrationController = async (req: Request, res: Response) =>
   }
 }
 
-export const userLoginController = async (req: Request, res: Response) => {
+export const userLogin = async (req: Request, res: Response) => {
   try{
-    const body = req.body;
-
-    const result = userLoginSchema.safeParse(body);
+    const result = userLoginSchema.safeParse(req.body);
 
     if(result.error) {
       return res.status(400).json({
-        message: z.flattenError(result.error).fieldErrors
+        errors: z.flattenError(result.error).fieldErrors
       })
     }
 
@@ -165,7 +161,7 @@ export const userLoginController = async (req: Request, res: Response) => {
   }
 }
 
-export const tokenRefreshController = async (req: Request, res: Response) => {
+export const tokenRefresh = async (req: Request, res: Response) => {
   try{
     const refreshToken = req.cookies.refreshToken;
 
@@ -263,28 +259,35 @@ export const tokenRefreshController = async (req: Request, res: Response) => {
   }
 }
 
-export const tokenLogoutController = async (req: Request, res: Response) => {
-  const user = req.user!;
+export const userLogout = async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
 
-  const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies.refreshToken;
 
-  if(refreshToken) {
-    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    if (refreshToken) {
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
-    await db.
-      update(refreshTokenSchema)
-      .set({ status: "EXPIRED" })
-      .where(eq(refreshTokenSchema.tokenHash, tokenHash));
+      await db
+        .update(refreshTokenSchema)
+        .set({ status: "EXPIRED" })
+        .where(eq(refreshTokenSchema.tokenHash, tokenHash));
 
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: '/api/auth',
-    })
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: '/api/auth',
+      });
+    }
+
+    return res.status(200).json({
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "INTERNAL SERVER ERROR",
+    });
   }
-
-  return res.status(200).json({
-    message: "Logged out successfully"
-  });
-}
+};

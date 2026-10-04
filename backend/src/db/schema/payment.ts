@@ -14,7 +14,8 @@ export const paymentSchema = pgTable("payment", {
   amount: integer("amount")
     .notNull(),
   currency: varchar("currency", { length: 3})
-    .notNull(),
+    .notNull()
+    .default("INR"),
   status: paymentStatusEnum("status").notNull(),
   provider: varchar("provider", { length: 255 })
     .notNull(),

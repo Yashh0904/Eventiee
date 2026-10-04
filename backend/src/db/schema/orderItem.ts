@@ -3,7 +3,7 @@ import { orderSchema } from "./order.js";
 import { ticketTypeSchema } from "./ticketType.js";
 
 export const orderItemSchema = pgTable("order_item", {
-  orderItemId: uuid("id")
+  id: uuid("id")
     .defaultRandom()
     .primaryKey(),
   orderId: uuid("order_id")
