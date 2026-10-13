@@ -18,7 +18,7 @@ export const createEvent = async (req: Request, res: Response) => {
       })
     }
 
-    const { name, venue, description, dateTime } = result.data;
+    const { name, venue, city, description, dateTime } = result.data;
 
     const [ event ] = await db
     .insert(eventSchema)
@@ -26,6 +26,7 @@ export const createEvent = async (req: Request, res: Response) => {
       organizerId: user.id,
       name,
       venue,
+      city,
       description,
       dateTime
     }).returning();

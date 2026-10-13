@@ -14,6 +14,8 @@ export const eventSchema = pgTable("event", {
     .notNull(),
   venue: varchar("venue", { length: 255 })
     .notNull(),
+  city: varchar("city", { length: 100 })
+    .notNull(),
   description: text('description').notNull(),
   dateTime: timestamp("date_time", { withTimezone: true })
     .notNull(),

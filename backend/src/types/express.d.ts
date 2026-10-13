@@ -5,7 +5,9 @@ type SafeUser = Omit<typeof userSchema.$inferSelect, "passwordHash">;
 declare global {
   namespace Express {
     interface Request {
-      user?: SafeUser
+      user?: SafeUser;
+      token?: string;
+      tokenExp?: number | undefined;
     }
   }
 }

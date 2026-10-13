@@ -4,6 +4,7 @@ import { flattenError } from "zod/v4/core";
 import { eventSchema, orderItemSchema, orderSchema, ticketTypeSchema } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { addOrderExpiryJob } from "../queues/orderExpiry.queue.js";
 
 export const createOrder = async (req: Request, res: Response) => {
   try{
@@ -86,6 +87,8 @@ export const createOrder = async (req: Request, res: Response) => {
 
       return order;
     })
+
+    await addOrderExpiryJob(orderTxn.id);
 
     return res.status(201).json({
       message: "Order initiated successfully",

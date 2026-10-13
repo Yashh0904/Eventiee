@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import app from './app.js'
+import './workers/orderExpiry.worker.js'
 
 async function startServer() {
   

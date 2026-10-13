@@ -7,6 +7,7 @@ import { db } from "../db/index.js";
 import { refreshTokenSchema, userSchema } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { createAccessToken, createRefreshToken } from "../services/authTokens.service.js";
+import { redis } from "../lib/redis.js";
 
 export const userRegistration = async (req: Request, res: Response) => {
   try{
@@ -262,6 +263,20 @@ export const tokenRefresh = async (req: Request, res: Response) => {
 export const userLogout = async (req: Request, res: Response) => {
   try {
     const user = req.user!;
+    const accessToken = req.token!;
+    const expiry = req.tokenExp;
+
+    const remainingTime = expiry ? Math.max(0, Math.floor(expiry - Date.now()/1000)) : 15 * 60;
+
+    const accessTokenHash = crypto
+      .createHash('sha256')
+      .update(accessToken)
+      .digest('hex');
+
+    if (remainingTime > 0) {
+      await redis.set(`blacklist:${accessTokenHash}`, "1", "EX", remainingTime);
+    }
+
 
     const refreshToken = req.cookies.refreshToken;
 

@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import crypto from "node:crypto"
 import jwt, { type JwtPayload } from "jsonwebtoken"
 import { db } from "../db/index.js";
 import { userSchema } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { redis } from "../lib/redis.js";
 
 export const authMiddleWare = async (req: Request, res: Response, next: NextFunction) => {
   const accessToken = req.headers.authorization?.split(" ")[1];
@@ -16,6 +18,13 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
   try {
     const decodedUser = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET!) as JwtPayload;
 
+    const tokenHash = crypto.createHash("sha-256").update(accessToken).digest("hex");
+    const isRevoked = await redis.exists(`blacklist:${tokenHash}`);
+    
+    if(isRevoked) {
+      return res.status(401).json({ message: "Token has been revoked. Please log in again." });
+    }
+
     const [ user ] = await db
       .select()
       .from(userSchema)
@@ -28,6 +37,8 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
     }
 
     req.user = user;
+    req.token = accessToken;
+    req.tokenExp = decodedUser.exp;
 
     next();
   } catch (error) {
