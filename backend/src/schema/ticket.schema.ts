@@ -1,12 +1,12 @@
 import z from "zod";
 
-export const ticketCreationSchema = z.object({
-  name: z.string().min(3, "Ticket tier name must be at least 3 characters").trim(),
-  price: z
+export const ticketSchema = z.object({
+  name: z.string().min(1, "Ticket tier name needed").trim(),
+  price: z.coerce
     .number()
     .int("Price must be a whole integer")
     .nonnegative("Price cannot be negative"),
-  quantity: z
+  quantity: z.coerce
     .number()
     .int("Quantity must be a whole integer")
     .positive("Quantity must be at least 1")

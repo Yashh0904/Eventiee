@@ -1,6 +1,6 @@
 import { pgEnum, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
-export const userRole = pgEnum("user_role", ["ORGANIZER", "ATTENDEE"]);
+export const userRole = pgEnum("user_role", ["USER", "ADMIN"]);
 
 export const userSchema = pgTable("user", {
   id: uuid("id")
@@ -14,7 +14,8 @@ export const userSchema = pgTable("user", {
   passwordHash: varchar("password_hash", { length: 255 })
     .notNull(),
   role: userRole("role")
-    .notNull(),
+    .notNull()
+    .default("USER"),
   avatarUrl: varchar("avatar_url", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true, mode:"date" })
     .defaultNow()

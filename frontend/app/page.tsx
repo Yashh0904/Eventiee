@@ -1,198 +1,133 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useAuthStore } from "@/lib/store/auth-store";
-import { api } from "@/lib/api";
+import { Navbar } from "@/components/layout/navbar";
+import { EventCard } from "@/components/events/EventCard";
+import { EventCardSkeleton } from "@/components/events/EventCardSkeleton";
+import { EventDetailsModal } from "@/components/events/EventDetailsModal";
+import { api, type EventItem } from "@/lib/api";
+import { Search, CalendarX } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import {
-  Sparkles,
-  Ticket,
-  CalendarDays,
-  ShieldCheck,
-  Zap,
-  ArrowRight,
-  LogOut,
-  User as UserIcon,
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "@/components/ui/toast";
 
 export default function HomePage() {
-  const { user, isAuthenticated, clearAuth } = useAuthStore();
-  const [isMounted, setIsMounted] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const [selectedEvent, setSelectedEvent] = React.useState<EventItem | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["events"],
+    queryFn: () => api.getEvents(),
+  });
 
   React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await api.logout();
-    } catch {
-      // ignore
-    } finally {
-      clearAuth();
+    if (isError) {
+      toast.add({
+        type: "error",
+        title: "Failed to load events",
+        description: error?.message || "Could not fetch events from the server.",
+      });
     }
+  }, [isError, error]);
+
+  const handleInspectEvent = (event: EventItem) => {
+    setSelectedEvent(event);
+    setIsDetailsOpen(true);
   };
 
+  const events = data?.events ?? [];
+
   return (
-    <div className="relative flex min-h-svh flex-col">
-      {/* Background glow */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 -z-10 h-[550px] w-[700px] -translate-x-1/2 rounded-full bg-primary/10 blur-[140px] dark:bg-primary/20" />
-      </div>
+    <div className="relative flex min-h-svh flex-col bg-transparent text-foreground">
+      <Navbar />
 
-      {/* Navigation */}
-      <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
-          <Link href="/" className="flex items-center gap-2.5 font-heading text-xl font-bold tracking-tight">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
-              <Sparkles className="size-4.5" />
-            </div>
-            <span>Eventiee</span>
-          </Link>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-10 pb-20 sm:px-6">
+        {/* Section Header: Discover Events */}
+        <section className="mb-6 space-y-2">
+          <h1 className="font-heading text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+            Discover Events
+          </h1>
+          <p className="text-sm text-muted-foreground sm:text-base">
+            Explore live music, tech conferences, underground nightlife, and curated gatherings.
+          </p>
+        </section>
 
-          <nav className="flex items-center gap-2.5">
-            {isMounted && isAuthenticated && user ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-muted/30 px-3 py-1.5">
-                  <UserIcon className="size-4 text-muted-foreground" />
-                  <span className="text-xs font-semibold text-foreground">
-                    {user.name}
-                  </span>
-                  <Badge variant="secondary" className="text-[10px] uppercase">
-                    {user.role}
-                  </Badge>
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-                  <LogOut className="mr-1.5 size-3.5" />
-                  Logout
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    Sign in
-                  </Button>
-                </Link>
-                <Link href="/signup">
-                  <Button size="sm" className="shadow-sm shadow-primary/20">
-                    Sign up
-                  </Button>
-                </Link>
-              </>
+        {/* Compact Search Toolbar */}
+        <section className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search events, venues, or cities..."
+              className="h-10 w-full rounded-xl border border-border/80 bg-card/60 pl-9.5 pr-8 text-sm text-foreground backdrop-blur-xl transition-all placeholder:text-muted-foreground/60 hover:border-primary/40 focus:border-primary focus:bg-card/90 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Clear
+              </button>
             )}
-          </nav>
-        </div>
-      </header>
+          </div>
 
-      {/* Hero Section */}
-      <main className="container mx-auto flex flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-8">
-        <Badge variant="secondary" className="mb-4 gap-1.5 px-3 py-1 text-xs">
-          <Sparkles className="size-3.5 text-primary" />
-          Production-Ready Event Management
-        </Badge>
+          <div className="text-xs font-medium text-muted-foreground">
+            Showing <span className="font-bold text-foreground">{isLoading ? "..." : events.length}</span> events
+          </div>
+        </section>
 
-        <h1 className="max-w-3xl font-heading text-4xl font-extrabold tracking-tight sm:text-6xl">
-          Discover incredible events,{" "}
-          <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-            instant digital ticketing.
-          </span>
-        </h1>
-
-        <p className="mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-          Experience seamless event booking with atomic ticket reservations,
-          crypto-secure QR check-ins, and lightning-fast gate management.
-        </p>
-
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
-          {isMounted && isAuthenticated ? (
-            <div className="flex flex-wrap gap-3">
-              <Button size="lg" className="shadow-lg shadow-primary/25">
-                <Ticket className="mr-2 size-4" />
-                Browse Events
-              </Button>
-              {user?.role === "ORGANIZER" && (
-                <Button size="lg" variant="outline">
-                  <CalendarDays className="mr-2 size-4" />
-                  Organizer Dashboard
-                </Button>
-              )}
+        {/* Event List Grid */}
+        <section>
+          {isLoading ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <EventCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : events.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {events.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onClick={() => handleInspectEvent(event)}
+                />
+              ))}
             </div>
           ) : (
-            <div className="flex flex-wrap gap-3">
-              <Link href="/signup">
-                <Button size="lg" className="shadow-lg shadow-primary/25">
-                  Get Started
-                  <ArrowRight className="ml-2 size-4" />
-                </Button>
-              </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline">
-                  Sign in
-                </Button>
-              </Link>
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border/60 bg-card/20 px-6 py-16 text-center backdrop-blur-sm">
+              <div className="flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+                <CalendarX className="size-7" />
+              </div>
+              <h3 className="mt-4 font-heading text-lg font-bold text-foreground">
+                No events found
+              </h3>
+              <p className="mt-1.5 max-w-sm text-xs text-muted-foreground">
+                We couldn't find any events matching your search criteria.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="mt-5 text-xs font-semibold"
+              >
+                Clear search
+              </Button>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Feature Grid */}
-        <div className="mt-20 grid w-full max-w-4xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
-          <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
-            <CardHeader className="space-y-1.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Zap className="size-4.5" />
-              </div>
-              <CardTitle className="text-base font-semibold">
-                Atomic Inventory
-              </CardTitle>
-              <CardDescription className="text-xs leading-relaxed">
-                Transactional ticket booking prevents race conditions, double-selling, and overselling.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
-            <CardHeader className="space-y-1.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <ShieldCheck className="size-4.5" />
-              </div>
-              <CardTitle className="text-base font-semibold">
-                Live QR Verification
-              </CardTitle>
-              <CardDescription className="text-xs leading-relaxed">
-                Instant gate check-in with tamper-proof cryptographic tokens and shortId fallback codes.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
-            <CardHeader className="space-y-1.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Ticket className="size-4.5" />
-              </div>
-              <CardTitle className="text-base font-semibold">
-                Live Pass Wallet
-              </CardTitle>
-              <CardDescription className="text-xs leading-relaxed">
-                Auto-surfacing active passes on event day with real-time wristband and tier metadata.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+        {/* Event Details Inspection Modal */}
+        <EventDetailsModal
+          event={selectedEvent}
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+        />
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-6 text-center text-xs text-muted-foreground">
-        Eventiee &copy; {new Date().getFullYear()} &middot; Built with Express, Drizzle ORM, Next.js, and Shadcn Base UI
-      </footer>
     </div>
   );
 }

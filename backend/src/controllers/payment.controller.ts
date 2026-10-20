@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import crypto from "node:crypto"
-import { paymentInitiationSchema, paymentVerificationSchema } from "../schema/payment.schema.js";
+import { paymentInitiationSchema, paymentSimulationSchema, paymentVerificationSchema } from "../schema/payment.schema.js";
 import { flattenError } from "zod/v4/core";
 import { db } from "../db/index.js";
 import { orderItemSchema, orderSchema, paymentSchema, ticketSchema } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { createProviderOrder, generateMockPayment, verifyProviderSignature } from "../services/paymentProvider.service.js";
+import { createGatewayOrder, providerPayment, verifyGatewaySignature } from "../services/paymentProvider.service.js";
 
 export const initiatePayment = async (req: Request, res: Response) => {
   try {
@@ -37,11 +37,36 @@ export const initiatePayment = async (req: Request, res: Response) => {
       });
     }
 
-    const providerOrder = await createProviderOrder(order.totalAmount, "INR", order.id);
-    const providerPayment = generateMockPayment(providerOrder.providerOrderId);
+    const providerOrder = await createGatewayOrder(order.totalAmount, "INR", order.id);
 
     return res.status(200).json({
-      providerPayment,
+      providerOrder,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "INTERNAL SERVER ERROR",
+    });
+  }
+};
+
+export const simulatePayment = async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const result = paymentSimulationSchema.safeParse(req.body);
+
+    if (result.error) {
+      return res.status(400).json({
+        errors: flattenError(result.error).fieldErrors,
+      });
+    }
+
+    const { orderId, gatewayOrderId, gatewayProvider, amount, currency } = result.data;
+
+    const paymentDetails = await providerPayment(orderId, gatewayOrderId, gatewayProvider);
+
+    return res.status(200).json({
+      paymentDetails
     });
   } catch (error) {
     console.error(error);
@@ -62,7 +87,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
       });
     }
 
-    const { orderId, providerOrderId, providerPaymentId, signature } = result.data;
+    const { orderId, gatewayOrderId, providerPaymentId, signature } = result.data;
 
     const [ order ] = await db
       .select()
@@ -81,7 +106,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
       });
     }
 
-    const verifiedPayment = verifyProviderSignature(providerOrderId, providerPaymentId, signature);
+    const verifiedPayment = verifyGatewaySignature(gatewayOrderId, providerPaymentId, signature);
 
     if (!verifiedPayment) {
       await db.insert(paymentSchema).values({
@@ -89,9 +114,9 @@ export const verifyPayment = async (req: Request, res: Response) => {
         amount: order.totalAmount,
         currency: "INR",
         status: "FAILED",
-        provider: "razorpay_mock",
+        provider: "mock",
         providerPaymentId,
-        providerOrderId,
+        providerOrderId: gatewayOrderId,
       });
 
       return res.status(400).json({
@@ -105,9 +130,9 @@ export const verifyPayment = async (req: Request, res: Response) => {
         amount: order.totalAmount,
         currency: "INR",
         status: "SUCCESSFUL",
-        provider: "razorpay_mock",
+        provider: "mock",
         providerPaymentId,
-        providerOrderId,
+        providerOrderId: gatewayOrderId,
       });
 
       await tx

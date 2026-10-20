@@ -22,7 +22,10 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
     const isRevoked = await redis.exists(`blacklist:${tokenHash}`);
     
     if(isRevoked) {
-      return res.status(401).json({ message: "Token has been revoked. Please log in again." });
+      return res.status(401).json({ 
+        message: "Token has been revoked. Please log in again",
+        tokenStatus: "REVOKED"
+       });
     }
 
     const [ user ] = await db
@@ -45,20 +48,8 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
     console.log(`ERROR: ${error}`);
 
     return res.status(401).json({
-        message: "Invalid or expired token"
+        message: "Invalid or expired token",
+        tokenStatus: "EXPIRED"
     });
-  }
-}
-
-export const requireRole = (allowedRole: 'ORGANIZER' | 'ATTENDEE') => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if(!req.user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    if(req.user.role !== allowedRole) {
-      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
-    }
-
-    next();
   }
 }

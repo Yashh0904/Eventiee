@@ -1,83 +1,55 @@
-import crypto from "node:crypto";
+import crypto from "node:crypto"
 
-export interface ProviderOrder {
-  provider: string;
-  providerOrderId: string;
-  amount: number;
-  currency: string;
-  createdAt: Date;
+interface GatewayOrder {
+  gatewayOrderId: string,
+  gatewayProvider: string,
+  amount: Number, 
+  currency: string,
+  createdAt: Date
 }
 
-export interface MockPaymentResult {
-  providerOrderId: string;
-  providerPaymentId: string;
-  signature: string;
+interface PaymentDetails {
+  gatewayOrderId: string, 
+  paymentId: string, 
+  signature: string
 }
 
-/**
- * Simulates creating an order with a Payment Provider (e.g. Razorpay).
- *
- * When switching to real Razorpay later:
- * Replace this implementation with:
- *   const order = await razorpay.orders.create({
- *     amount: amount * 100, // paise
- *     currency,
- *     receipt: internalOrderId
- *   });
- *   return { provider: "razorpay", providerOrderId: order.id, ... };
- */
-export const createProviderOrder = async (
-  amount: number,
-  currency: string = "INR",
-  internalOrderId: string
-): Promise<ProviderOrder> => {
-  const providerOrderId = `order_${crypto.randomBytes(10).toString("hex")}`;
+export const createGatewayOrder = async (amount: Number, currency: string, orderId: string): Promise<GatewayOrder> => {
+  const gatewayOrderId = `order_${crypto.randomBytes(10).toString('hex')}`
 
-  return {
-    provider: "razorpay_mock",
-    providerOrderId,
-    amount,
+  // gateway db inserts GatewayOrder
+
+  return { 
+    gatewayOrderId,
+    gatewayProvider: "mock",
+    amount, 
     currency,
-    createdAt: new Date(),
-  };
-};
-
-/**
- * Simulates verifying a cryptographic payment signature from the provider.
- *
- * In real Razorpay:
- *   const generatedSignature = crypto
- *     .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
- *     .update(`${providerOrderId}|${providerPaymentId}`)
- *     .digest("hex");
- *   return generatedSignature === signature;
- */
-export const verifyProviderSignature = (
-  providerOrderId: string,
-  providerPaymentId: string,
-  signature?: string
-): boolean => {
-  if (!providerOrderId || !providerPaymentId) {
-    return false;
+    createdAt: new Date()
   }
+}
 
-  // In mock/simulated mode, verify that IDs are provided
-  return true;
-};
+export const providerPayment = async (orderId: string, gatewayOrderId: string, gatewayProvider: string): Promise<PaymentDetails> => {
+  const paymentId = `${gatewayProvider}_${crypto.randomBytes(10).toString('hex')}`;
 
-/**
- * Dev helper: Generates simulated payment proof (what the frontend would normally receive from Razorpay)
- */
-export const generateMockPayment = (providerOrderId: string): MockPaymentResult => {
-  const providerPaymentId = `pay_${crypto.randomBytes(10).toString("hex")}`;
+  // bank apis probably with amount and currency as well
+
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   const signature = crypto
-    .createHmac("sha256", "mock_secret")
-    .update(`${providerOrderId}|${providerPaymentId}`)
-    .digest("hex");
+    .createHmac('sha256', process.env.PAYMENT_SERVICE_SECRET!)
+    .update(`${gatewayOrderId}|${paymentId}`)
+    .digest('hex');
 
-  return {
-    providerOrderId,
-    providerPaymentId,
-    signature,
-  };
-};
+  // another provider db insert
+
+  return {gatewayOrderId, paymentId, signature}
+}
+
+export const verifyGatewaySignature = (gatewayOrderId: string, providerPaymentId: string, signature: string) => {
+  const signatureCheck = crypto
+    .createHmac('sha256', process.env.PAYMENT_SERVICE_SECRET!)
+    .update(`${gatewayOrderId}|${providerPaymentId}`)
+    .digest('hex');
+  
+  return signature === signatureCheck
+}

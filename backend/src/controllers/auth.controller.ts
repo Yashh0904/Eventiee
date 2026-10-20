@@ -19,7 +19,7 @@ export const userRegistration = async (req: Request, res: Response) => {
       })
     }
 
-    const { name, email, password, role } = result.data;
+    const { name, email, password } = result.data;
 
     const [ userExists ] = await db
       .select()
@@ -40,15 +40,14 @@ export const userRegistration = async (req: Request, res: Response) => {
         name,
         email,
         passwordHash,
-        role
       }).returning();
 
     if(!user){
       throw new Error("User creation failed")
     }
 
-    const refreshToken = createRefreshToken( user.id, role);
-    const accessToken = createAccessToken( user.id, role);
+    const refreshToken = createRefreshToken(user.id, user.role);
+    const accessToken = createAccessToken(user.id, user.role);
 
     const familyId = crypto.randomUUID();
 

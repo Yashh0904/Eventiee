@@ -2,9 +2,9 @@ import type { Request, Response } from "express";
 import { eventCreationSchema } from "../schema/event.schema.js";
 import z from "zod";
 import { db } from "../db/index.js";
-import { eventSchema, ticketTypeSchema } from "../db/schema.js";
-import { and, eq, gt } from "drizzle-orm";
-import { ticketCreationSchema } from "../schema/ticket.schema.js";
+import { eventSchema, ticketTypeSchema, userSchema } from "../db/schema.js";
+import { and, eq, getTableColumns, gt } from "drizzle-orm";
+import { ticketSchema } from "../schema/ticket.schema.js";
 
 export const createEvent = async (req: Request, res: Response) => {
   try {
@@ -18,22 +18,41 @@ export const createEvent = async (req: Request, res: Response) => {
       })
     }
 
-    const { name, venue, city, description, dateTime } = result.data;
+    const { name, venue, city, description, dateTime, endDateTime, bannerUrl, tickets } = result.data;
 
-    const [ event ] = await db
-    .insert(eventSchema)
-    .values({
-      organizerId: user.id,
-      name,
-      venue,
-      city,
-      description,
-      dateTime
-    }).returning();
+    const createdData = await db.transaction(async (tx) => {
+      const [ event ] = await tx
+        .insert(eventSchema)
+        .values({
+          organizerId: user.id,
+          name,
+          venue,
+          city,
+          description,
+          dateTime,
+          endDateTime,
+          bannerUrl: bannerUrl || null
+        }).returning();
+
+      if (!event) {
+        throw new Error("Failed to create event");
+      }
+
+      const ticketRows = tickets.map((ticket) => ({
+        ...ticket,
+        eventId: event.id,
+      }));  
+
+      const createdTicketTypes = await tx
+        .insert(ticketTypeSchema)
+        .values(ticketRows)
+
+      return {event, tickets: createdTicketTypes}
+    })
 
     return res.status(200).json({
       message: "Event created",
-      event
+      ...createdData,
     });
   } catch(error) {
     console.error(error);
@@ -47,9 +66,38 @@ export const createEvent = async (req: Request, res: Response) => {
 export const getEvents = async (req: Request, res: Response) => {
   try {
     const events = await db
-      .select()
+      .select({
+        ...getTableColumns(eventSchema),
+        organizerName: userSchema.name
+      })
       .from(eventSchema)
+      .innerJoin(userSchema, eq(eventSchema.organizerId, userSchema.id))
       .where(gt(eventSchema.dateTime, new Date()))
+
+    return res.status(200).json({
+      events
+    });
+  } catch (error) {
+    console.log(error);
+
+    return res.status(500).json({
+      message: "INTERNAL SERVER ERROR!"
+    })
+  }
+}
+
+export const getMyEvents = async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+
+    const events = await db
+      .select({
+        ...getTableColumns(eventSchema),
+        organizerName: userSchema.name
+      })
+      .from(eventSchema)
+      .innerJoin(userSchema, eq(eventSchema.organizerId, userSchema.id))
+      .where(eq(eventSchema.organizerId, user.id))
 
     return res.status(200).json({
       events
@@ -70,8 +118,12 @@ export const getEvent = async (req: Request<EventIdParam>, res: Response) => {
     const { eventId } = req.params;
 
     const [ event ] = await db
-      .select()
+      .select({
+        ...getTableColumns(eventSchema),
+        organizerName: userSchema.name,
+      })
       .from(eventSchema)
+      .innerJoin(userSchema, eq(eventSchema.organizerId, userSchema.id))
       .where(eq(eventSchema.id, eventId));
 
     if(!event) {
@@ -80,8 +132,14 @@ export const getEvent = async (req: Request<EventIdParam>, res: Response) => {
       })
     }
 
+    const ticketTypes = await db
+    .select()
+    .from(ticketTypeSchema)
+    .where(eq(ticketTypeSchema.eventId, event.id));
+
     return res.status(200).json({
-      event
+      event,
+      ticketTypes
     });
   } catch (error) {
     console.log(error);
@@ -113,7 +171,7 @@ export const createTicketType = async (req: Request<EventIdParam>, res: Response
 
     const body = req.body;
 
-    const result = ticketCreationSchema.safeParse(body);
+    const result = ticketSchema.safeParse(body);
 
     if(result.error) {
       return res.status(400).json({

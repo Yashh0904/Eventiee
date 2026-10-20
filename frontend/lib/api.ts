@@ -1,4 +1,4 @@
-import { useAuthStore, type User, type UserRole } from "./store/auth-store";
+import { useAuthStore, type User } from "./store/auth-store";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}, isRetry= false): Promise<T> {
   const token = useAuthStore.getState().accessToken;
 
   const headers = new Headers(options.headers);
@@ -28,12 +28,27 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: "include", // essential for httpOnly refreshToken cookie
+    credentials: "include", 
   });
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const tokenStatus = data?.tokenStatus;
+    if(tokenStatus === "REVOKED"){
+      useAuthStore.getState().clearAuth();
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
+      throw new ApiError(data.message || "Session revoked", response.status);
+    }
+    if(response.status === 401 && tokenStatus === "EXPIRED" && !isRetry) {
+      const newToken = await refreshAccessToken();
+
+      if (newToken) {
+        return request<T>(endpoint, options, true);
+      }
+    }
     const message =
       data.message ||
       (data.errors ? "Validation error occurred" : "An error occurred with the request");
@@ -43,11 +58,38 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return data as T;
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null>  {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Refresh failed");
+      const data = await res.json();
+      useAuthStore.getState().setAuth(data.user, data.accessToken);
+      return data.accessToken;
+    } catch {
+      useAuthStore.getState().clearAuth();
+
+      if(typeof window !== 'undefined') {
+        window.location.href = "/";
+      }
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
 }
 
 export interface LoginPayload {
@@ -58,6 +100,43 @@ export interface LoginPayload {
 export interface AuthResponse {
   accessToken: string;
   user: User;
+}
+
+
+export interface EventItem {
+  id: string;
+  organizerId: string;
+  organizerName: string;
+  name: string;
+  venue: string;
+  city: string;
+  description: string;
+  dateTime: string;
+  endDateTime?: string | null;
+  bannerUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketType {
+  name: string,
+  price: number,
+  quantity: number
+}
+
+export interface EventPayload {
+  name: string;
+  venue: string;
+  city: string;
+  description: string;
+  dateTime: string;
+  endDateTime?: string | null;
+  bannerUrl?: string | null;
+  tickets: TicketType[]
+}
+
+export interface EventsResponse {
+  events: EventItem[];
 }
 
 export const api = {
@@ -82,4 +161,25 @@ export const api = {
     request<AuthResponse>("/api/auth/refresh", {
       method: "POST",
     }),
+
+  getEvents: (params?: { city?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.city && params.city !== "All") {
+      searchParams.set("city", params.city);
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    return request<EventsResponse>(`/api/event${query}`);
+  },
+
+  getMyEvents: () => 
+    request<EventsResponse>('/api/event/me'),
+
+  getEvent: (eventId: string) =>
+    request<{ event: EventItem, ticketTypes?: TicketType[] }>(`/api/event/${eventId}`),
+
+  createEvent: (payload: EventPayload) => 
+    request<EventItem & TicketType[]>('/api/event', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
 };

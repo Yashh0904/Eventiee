@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/auth-store";
-import { Mail, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, Lock, ArrowRight, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,13 +24,18 @@ export default function LoginPage() {
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const loginMutation = useMutation({
     mutationFn: () => api.login({ email, password }),
     onSuccess: (data) => {
       setAuth(data.user, data.accessToken);
-      router.push("/");
+      const redirectUrl =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("redirect") || "/"
+          : "/";
+      router.push(redirectUrl);
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
@@ -48,12 +53,12 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="border border-white/[0.08] bg-[#0e0b1f]/75 shadow-[0_16px_50px_-12px_rgba(124,58,237,0.22)] backdrop-blur-2xl">
+    <Card className="border border-border/80 bg-card/80 shadow-[0_20px_50px_-12px_var(--color-primary)/20] backdrop-blur-2xl">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-xl font-bold tracking-tight text-white">
+        <CardTitle className="text-xl font-bold tracking-tight text-foreground">
           Welcome back
         </CardTitle>
-        <CardDescription className="text-zinc-400">
+        <CardDescription className="text-muted-foreground">
           Enter your email and password to access your account
         </CardDescription>
       </CardHeader>
@@ -61,7 +66,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {errorMessage && (
-            <div className="flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/15 px-3.5 py-2.5 text-xs text-red-300">
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/15 px-3.5 py-2.5 text-xs text-destructive">
               <AlertCircle className="size-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -70,12 +75,12 @@ export default function LoginPage() {
           <div className="space-y-2">
             <label
               htmlFor="email"
-              className="text-xs font-medium text-zinc-300"
+              className="text-xs font-medium text-foreground"
             >
               Email Address
             </label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="email"
                 type="email"
@@ -83,7 +88,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-10 rounded-xl border border-white/[0.08] bg-white/[0.03] pl-10 text-white placeholder:text-zinc-500 hover:border-white/15 focus-visible:border-primary/60 focus-visible:ring-primary/20"
+                className="h-10 rounded-xl border border-border bg-background/80 pl-10 text-foreground placeholder:text-muted-foreground/60 hover:border-primary/40 focus-visible:border-primary focus-visible:ring-primary/20"
                 autoComplete="email"
               />
             </div>
@@ -93,23 +98,36 @@ export default function LoginPage() {
             <div className="flex items-center justify-between">
               <label
                 htmlFor="password"
-                className="text-xs font-medium text-zinc-300"
+                className="text-xs font-medium text-foreground"
               >
                 Password
               </label>
             </div>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-10 rounded-xl border border-white/[0.08] bg-white/[0.03] pl-10 text-white placeholder:text-zinc-500 hover:border-white/15 focus-visible:border-primary/60 focus-visible:ring-primary/20"
+                className="h-10 rounded-xl border border-border bg-background/80 pl-10 pr-10 text-foreground placeholder:text-muted-foreground/60 hover:border-primary/40 focus-visible:border-primary focus-visible:ring-primary/20"
                 autoComplete="current-password"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
             </div>
           </div>
         </CardContent>
@@ -133,11 +151,11 @@ export default function LoginPage() {
             )}
           </Button>
 
-          <p className="text-center text-xs text-zinc-400">
+          <p className="text-center text-xs text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link
               href="/signup"
-              className="font-medium text-purple-400 underline-offset-4 hover:underline"
+              className="font-medium text-primary underline-offset-4 hover:underline"
             >
               Sign up
             </Link>

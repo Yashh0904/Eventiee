@@ -1,5 +1,5 @@
 import express from "express";
-import { authMiddleWare, requireRole } from "../middlewares/authMiddleware.js";
+import { authMiddleWare } from "../middlewares/authMiddleware.js";
 import {
   checkIn,
   getMyTickets,
@@ -8,7 +8,8 @@ import {
 
 const ticketRouter = express.Router();
 
-ticketRouter.post("/checkin", authMiddleWare, requireRole('ORGANIZER'), checkIn);
+// Gate check-in: verifies that the scanner is the creator of the event inside controller
+ticketRouter.post("/checkin", authMiddleWare, checkIn);
 
 ticketRouter.get("/me", authMiddleWare, getMyTickets);
 
