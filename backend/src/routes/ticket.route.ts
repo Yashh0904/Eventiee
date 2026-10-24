@@ -8,7 +8,6 @@ import {
 
 const ticketRouter = express.Router();
 
-// Gate check-in: verifies that the scanner is the creator of the event inside controller
 ticketRouter.post("/checkin", authMiddleWare, checkIn);
 
 ticketRouter.get("/me", authMiddleWare, getMyTickets);

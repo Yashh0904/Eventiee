@@ -61,9 +61,7 @@ export const getMyTickets = async (req: Request, res: Response) => {
       .where(and(...conditions))
       .orderBy(orderByClause);
 
-    return res.status(200).json({
-      tickets,
-    });
+    return res.status(200).json(tickets);
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -132,18 +130,22 @@ export const getTicketDetails = async (req: Request<TicketParam>, res: Response)
 export const checkIn = async (req: Request, res: Response) => {
   try {
     const user = req.user!;
-
-    const { qrToken, shortId } = req.body;
+    const { qrToken, shortId, eventId } = req.body;
 
     if (!qrToken && !shortId) {
       return res.status(400).json({
-        message: "Received no qr token or shortId to scan",
+        message: "Received no qr token to scan",
+      });
+    }
+    else if(shortId && !eventId) {
+      return res.status(400).json({
+        message: "eventId is required when checking in with shortId",
       });
     }
 
     const condition = qrToken
       ? eq(ticketSchema.qrToken, qrToken)
-      : eq(ticketSchema.shortId, shortId);
+      : and(eq(ticketSchema.eventId, eventId), eq(ticketSchema.shortId, shortId));
 
     const [ ticket ] = await db
       .select()
@@ -201,7 +203,16 @@ export const checkIn = async (req: Request, res: Response) => {
         status: "USED",
         checkedInAt: new Date(),
       })
-      .where(eq(ticketSchema.id, ticket.id)).returning();
+      .where(and(
+        eq(ticketSchema.id, ticket.id),
+        eq(ticketSchema.status, "VALID")
+      )).returning();
+
+    if(!updatedTicket){
+      return res.status(409).json({
+        message: "Ticket has already been checked in or is no longer valid",
+      });
+    }
 
     return res.status(200).json({
       message: "Check in successful",

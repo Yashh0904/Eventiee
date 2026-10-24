@@ -6,11 +6,12 @@ import eventRouter from "./routes/event.route.js";
 import orderRouter from "./routes/order.route.js";
 import paymentRouter from "./routes/payment.routes.js";
 import ticketRouter from "./routes/ticket.route.js";
+import { env } from "./config/env.js";
 
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: process.env.FRONTEND_URL! || "http://localhost:3000",
+    origin: env.FRONTEND_URL,
     credentials: true
 }));
 app.use(cookieParser())

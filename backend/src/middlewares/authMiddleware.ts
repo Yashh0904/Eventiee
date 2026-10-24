@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { userSchema } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { redis } from "../lib/redis.js";
+import { env } from "../config/env.js";
 
 export const authMiddleWare = async (req: Request, res: Response, next: NextFunction) => {
   const accessToken = req.headers.authorization?.split(" ")[1];
@@ -16,7 +17,7 @@ export const authMiddleWare = async (req: Request, res: Response, next: NextFunc
   }
 
   try {
-    const decodedUser = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET!) as JwtPayload;
+    const decodedUser = jwt.verify(accessToken, env.ACCESS_TOKEN_SECRET) as JwtPayload;
 
     const tokenHash = crypto.createHash("sha-256").update(accessToken).digest("hex");
     const isRevoked = await redis.exists(`blacklist:${tokenHash}`);

@@ -1,4 +1,5 @@
 import crypto from "node:crypto"
+import { env } from "../config/env.js";
 
 interface GatewayOrder {
   gatewayOrderId: string,
@@ -36,7 +37,7 @@ export const providerPayment = async (orderId: string, gatewayOrderId: string, g
   await new Promise((resolve) => setTimeout(resolve, 500));
 
   const signature = crypto
-    .createHmac('sha256', process.env.PAYMENT_SERVICE_SECRET!)
+    .createHmac('sha256', env.PAYMENT_SERVICE_SECRET)
     .update(`${gatewayOrderId}|${paymentId}`)
     .digest('hex');
 
@@ -47,7 +48,7 @@ export const providerPayment = async (orderId: string, gatewayOrderId: string, g
 
 export const verifyGatewaySignature = (gatewayOrderId: string, providerPaymentId: string, signature: string) => {
   const signatureCheck = crypto
-    .createHmac('sha256', process.env.PAYMENT_SERVICE_SECRET!)
+    .createHmac('sha256', env.PAYMENT_SERVICE_SECRET)
     .update(`${gatewayOrderId}|${providerPaymentId}`)
     .digest('hex');
   

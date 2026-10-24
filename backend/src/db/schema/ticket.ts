@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { eventSchema } from "./event.js";
 import { ticketTypeSchema } from "./ticketType.js";
 import { userSchema } from "./user.js";
@@ -28,7 +28,7 @@ export const ticketSchema = pgTable("ticket", {
   orderId: uuid("order_id")
       .notNull()
       .references(() => orderSchema.id),
-  shortId: integer("short_id")
+  shortId: varchar("short_id", {length: 6})
     .notNull(),
   status: ticketStatusEnum("status")
     .notNull(),

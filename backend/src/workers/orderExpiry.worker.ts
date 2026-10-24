@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { type OrderExpiryJobData } from "../queues/orderExpiry.queue.js";
 import { db } from "../db/index.js";
 import { orderItemSchema, orderSchema, ticketTypeSchema } from "../db/schema.js";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { redis } from "../lib/redis.js";
 
 export const orderExpiryWorker = new Worker<OrderExpiryJobData>(
@@ -29,10 +29,17 @@ export const orderExpiryWorker = new Worker<OrderExpiryJobData>(
     }
 
     await db.transaction(async (tx) => {
-      await tx
+      const [expiredOrder] = await tx
         .update(orderSchema)
         .set({ status: "EXPIRED" })
-        .where(eq(orderSchema.id, orderId));
+        .where(and(
+          eq(orderSchema.id, orderId),
+          eq(orderSchema.status, "PENDING")
+        )).returning();
+      
+      if (!expiredOrder) {
+        return; 
+      }
 
       const items = await tx
         .select()

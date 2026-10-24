@@ -2,7 +2,7 @@ import type { Request, Response } from "express"
 import { orderCreationSchema } from "../schema/order.schema.js"
 import { flattenError } from "zod/v4/core";
 import { eventSchema, orderItemSchema, orderSchema, ticketTypeSchema } from "../db/schema.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { addOrderExpiryJob } from "../queues/orderExpiry.queue.js";
 
@@ -30,7 +30,60 @@ export const createOrder = async (req: Request, res: Response) => {
       })
     }
 
+    const [ orderExists ] = await db
+      .select()
+      .from(orderSchema)
+      .where(and(
+        eq(orderSchema.userId, user.id),
+        eq(orderSchema.eventId, eventId),
+        eq(orderSchema.status, "PENDING"),
+      ));
+
+    let existingItems: { ticketTypeId: string; quantity: number }[] = [];
+
+    if(orderExists) {
+      existingItems = await db
+        .select({
+          ticketTypeId: orderItemSchema.ticketTypeId,
+          quantity: orderItemSchema.quantity
+        })
+        .from(orderItemSchema)
+        .where(eq(orderItemSchema.orderId, orderExists.id));
+
+      const isIdentical = 
+        existingItems.length === items.length &&
+        existingItems.every((oldItem) => 
+          items.some((newItem) => 
+            newItem.ticketTypeId === oldItem.ticketTypeId
+            &&
+            newItem.quantity === oldItem.quantity
+          ));
+
+      if (isIdentical) {
+        return res.status(200).json(orderExists);
+      }
+    }
+
     const orderTxn = await db.transaction(async (tx) => {
+      if(orderExists) {
+        const [ cancelledOrder ] = await tx
+          .update(orderSchema)
+          .set({status: "CANCELLED"})
+          .where(and(
+            eq(orderSchema.id, orderExists.id),
+            eq(orderSchema.status, "PENDING")
+          )).returning();
+
+        if(cancelledOrder){
+          for (const oldItem of existingItems) {
+            await tx
+              .update(ticketTypeSchema)
+              .set({ quantity: sql`${ticketTypeSchema.quantity} + ${oldItem.quantity}` })
+              .where(eq(ticketTypeSchema.id, oldItem.ticketTypeId));
+          }
+        }
+      }
+
       let totalAmount = 0;
       let preparedOrderItems = [];
 
@@ -51,18 +104,26 @@ export const createOrder = async (req: Request, res: Response) => {
           throw new Error(`Only ${ticketType.quantity} tickets remaining for ${ticketType.name}`);
         }
 
-        await tx
+        const [ updatedTier ] = await tx
           .update(ticketTypeSchema)
-          .set({ quantity: ticketType.quantity - item.quantity })
-          .where(eq(ticketTypeSchema.id, item.ticketTypeId))
+          .set({ quantity: sql`${ticketTypeSchema.quantity} - ${item.quantity}` })
+          .where(and(
+            eq(ticketTypeSchema.id, item.ticketTypeId),
+            eq(ticketTypeSchema.eventId, eventId),
+            gte(ticketTypeSchema.quantity, item.quantity)
+          )).returning();
+
+        if (!updatedTier) {
+          throw new Error(`Insufficient tickets remaining`);
+        }
 
         preparedOrderItems.push({
           ticketTypeId: item.ticketTypeId,
           quantity: item.quantity,
-          unitPrice: ticketType.price,
+          unitPrice: updatedTier.price,
         });
 
-        totalAmount += ticketType.price * item.quantity;
+        totalAmount += updatedTier.price * item.quantity;
       }
 
       const [ order ] = await tx
@@ -91,8 +152,7 @@ export const createOrder = async (req: Request, res: Response) => {
     await addOrderExpiryJob(orderTxn.id);
 
     return res.status(201).json({
-      message: "Order initiated successfully",
-      order: orderTxn,
+      ...orderTxn,
     });
   } catch(error: any) {
     return res.status(400).json({

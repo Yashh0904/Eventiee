@@ -4,8 +4,9 @@ import { paymentInitiationSchema, paymentSimulationSchema, paymentVerificationSc
 import { flattenError } from "zod/v4/core";
 import { db } from "../db/index.js";
 import { orderItemSchema, orderSchema, paymentSchema, ticketSchema } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createGatewayOrder, providerPayment, verifyGatewaySignature } from "../services/paymentProvider.service.js";
+import { nanoid } from "nanoid";
 
 export const initiatePayment = async (req: Request, res: Response) => {
   try {
@@ -23,7 +24,10 @@ export const initiatePayment = async (req: Request, res: Response) => {
     const [ order ] = await db
       .select()
       .from(orderSchema)
-      .where(eq(orderSchema.id, orderId));
+      .where(and(
+        eq(orderSchema.userId, user.id),
+        eq(orderSchema.id, orderId)
+      ));
 
     if (!order) {
       return res.status(404).json({
@@ -40,7 +44,7 @@ export const initiatePayment = async (req: Request, res: Response) => {
     const providerOrder = await createGatewayOrder(order.totalAmount, "INR", order.id);
 
     return res.status(200).json({
-      providerOrder,
+      ...providerOrder
     });
   } catch (error) {
     console.error(error);
@@ -66,7 +70,7 @@ export const simulatePayment = async (req: Request, res: Response) => {
     const paymentDetails = await providerPayment(orderId, gatewayOrderId, gatewayProvider);
 
     return res.status(200).json({
-      paymentDetails
+      ...paymentDetails
     });
   } catch (error) {
     console.error(error);
@@ -92,7 +96,10 @@ export const verifyPayment = async (req: Request, res: Response) => {
     const [ order ] = await db
       .select()
       .from(orderSchema)
-      .where(eq(orderSchema.id, orderId));
+      .where(and(
+        eq(orderSchema.id, orderId),
+        eq(orderSchema.userId, user.id)
+      ));
 
     if (!order) {
       return res.status(404).json({
@@ -135,10 +142,17 @@ export const verifyPayment = async (req: Request, res: Response) => {
         providerOrderId: gatewayOrderId,
       });
 
-      await tx
+      const [ completedOrder ] = await tx
         .update(orderSchema)
         .set({ status: "COMPLETED" })
-        .where(eq(orderSchema.id, orderId));
+        .where(and(
+          eq(orderSchema.id, orderId),
+          eq(orderSchema.status, "PENDING")
+        )).returning();
+
+      if (!completedOrder) {
+        throw new Error("Order has expired or has already been completed");
+      }
 
       const items = await tx
         .select()
@@ -150,11 +164,11 @@ export const verifyPayment = async (req: Request, res: Response) => {
       for (const item of items) {
         for (let i = 0; i < item.quantity; i++) {
           tickets.push({
-            attendeeId: user.id,
+            attendeeId: order.userId,
             eventId: order.eventId,
             orderId: order.id,
             ticketTypeId: item.ticketTypeId,
-            shortId: Math.floor(100000 + Math.random() * 900000),
+            shortId: nanoid(6),
             qrToken: crypto.randomBytes(32).toString("hex"),
             status: "VALID",
           });
@@ -165,7 +179,6 @@ export const verifyPayment = async (req: Request, res: Response) => {
     });
 
     return res.status(200).json({
-      message: "Payment verified and tickets issued successfully",
       tickets: issuedTickets,
     });
   } catch (error) {

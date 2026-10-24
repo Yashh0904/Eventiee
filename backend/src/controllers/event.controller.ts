@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { eventCreationSchema } from "../schema/event.schema.js";
+import { eventCreationSchema, updateEventSchema } from "../schema/event.schema.js";
 import z from "zod";
 import { db } from "../db/index.js";
 import { eventSchema, ticketTypeSchema, userSchema } from "../db/schema.js";
@@ -201,3 +201,56 @@ export const createTicketType = async (req: Request<EventIdParam>, res: Response
     })
   }
 }
+
+export const updateEvent = async (req: Request<EventIdParam>, res: Response) => {
+  try {
+    const user = req.user!;
+    const { eventId } = req.params;
+
+    const result = updateEventSchema.safeParse(req.body);
+
+    if (result.error) {
+      return res.status(400).json({
+        errors: z.flattenError(result.error).fieldErrors,
+      });
+    }
+
+    const [ existingEvent ] = await db
+      .select()
+      .from(eventSchema)
+      .where(eq(eventSchema.id, eventId));
+
+    if (!existingEvent) {
+      return res.status(404).json({
+        message: "Event not found",
+      });
+    }
+
+    if (existingEvent.organizerId !== user.id && user.role !== "ADMIN") {
+      return res.status(403).json({
+        message: "You are not authorized to update this event",
+      });
+    }
+
+    const updateFields = result.data;
+
+    const [ updatedEvent ] = await db
+      .update(eventSchema)
+      .set({
+        ...updateFields,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventSchema.id, eventId))
+      .returning();
+
+    return res.status(200).json({
+      message: "Event updated successfully",
+      event: updatedEvent,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "INTERNAL SERVER ERROR!",
+    });
+  }
+};

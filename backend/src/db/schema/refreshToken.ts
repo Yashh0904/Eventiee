@@ -11,7 +11,8 @@ export const refreshTokenSchema = pgTable("refresh_token", {
     .notNull()
     .references(() => userSchema.id, { onDelete: "cascade" }),
   tokenHash: text("token_hash")
-    .notNull(),
+    .notNull()
+    .unique(),
   familyId: uuid("family_id")
     .notNull(),
   status: refreshTokenStatusEnum("status")
