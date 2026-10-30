@@ -8,6 +8,7 @@ export const env = z.object({
   REFRESH_TOKEN_SECRET: z.string().min(32),
   PAYMENT_SERVICE_SECRET: z.string().min(32),
   FRONTEND_URL: z.url(),
+  REDIS_URL: z.string().optional(),
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   PORT: z.coerce.number().int().min(1).max(65535).default(5000),
