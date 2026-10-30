@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { type EventItem } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Calendar, MapPin, Sparkles, ArrowRight, Building, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EventItem } from "@/types";
 
 interface EventDetailsModalProps {
   event: EventItem | null;

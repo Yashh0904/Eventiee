@@ -1,3 +1,5 @@
+"use client"
+
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
@@ -6,6 +8,9 @@ import { QueryProvider } from "@/components/providers/query-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/toast"
 import { cn } from "@/lib/utils";
+import React from "react"
+import { api } from "@/lib/api"
+import { useAuthStore } from "@/lib/store/auth-store"
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
 
@@ -19,6 +24,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  React.useEffect(() => {
+    api.refreshToken()
+  }, [])
+
   return (
     <html
       lang="en"

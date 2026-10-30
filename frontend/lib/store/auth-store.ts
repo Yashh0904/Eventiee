@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
-export type UserRole = "ORGANIZER" | "ATTENDEE";
+export type UserRole = "USER" | "ADMIN";
+
+export type AuthStatus = "loading" | "authenticated" | "anonymous"
 
 export interface User {
   id: string;
@@ -14,32 +15,34 @@ export interface User {
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  isAuthenticated: boolean;
+  authStatus: AuthStatus;
   setAuth: (user: User, accessToken: string) => void;
+  setAuthStatus: (status: AuthStatus) => void;
+  updateUser: (updatedFields: Partial<User>) => void;
   clearAuth: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      accessToken: null,
-      isAuthenticated: false,
-      setAuth: (user, accessToken) =>
-        set({
-          user,
-          accessToken,
-          isAuthenticated: true,
-        }),
-      clearAuth: () =>
-        set({
-          user: null,
-          accessToken: null,
-          isAuthenticated: false,
-        }),
-    }),
-    {
-      name: "eventiee-auth",
-    }
-  )
+  (set) => ({
+    user: null,
+    accessToken: null,
+    authStatus: "loading",
+    setAuth: (user, accessToken) =>
+      set({
+        user,
+        accessToken,
+        authStatus: "authenticated",
+      }),
+      setAuthStatus: (authStatus) => set({ authStatus }),
+    updateUser: (updatedFields) =>
+      set((state) => ({
+        user: state.user ? { ...state.user, ...updatedFields } : null,
+      })),
+    clearAuth: () =>
+      set({
+        user: null,
+        accessToken: null,
+        authStatus: "anonymous",
+      }),
+  }),
 );

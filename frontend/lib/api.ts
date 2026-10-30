@@ -1,3 +1,4 @@
+import { AuthResponse, EventItem, EventPayload, EventsResponse, LoginPayload, OrderPayload, OrderResponse, PaymentResponse, PaymentSimulationPayload, PaymentSimulationResponse, PaymentVerification, RegisterPayload, TicketItem, Tickets, TicketType } from "@/types";
 import { useAuthStore, type User } from "./store/auth-store";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -74,69 +75,12 @@ async function refreshAccessToken(): Promise<string | null>  {
       return data.accessToken;
     } catch {
       useAuthStore.getState().clearAuth();
-
-      if(typeof window !== 'undefined') {
-        window.location.href = "/";
-      }
       return null;
     } finally {
       refreshPromise = null;
     }
   })();
   return refreshPromise;
-}
-
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-}
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  accessToken: string;
-  user: User;
-}
-
-
-export interface EventItem {
-  id: string;
-  organizerId: string;
-  organizerName: string;
-  name: string;
-  venue: string;
-  city: string;
-  description: string;
-  dateTime: string;
-  endDateTime?: string | null;
-  bannerUrl?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface TicketType {
-  name: string,
-  price: number,
-  quantity: number
-}
-
-export interface EventPayload {
-  name: string;
-  venue: string;
-  city: string;
-  description: string;
-  dateTime: string;
-  endDateTime?: string | null;
-  bannerUrl?: string | null;
-  tickets: TicketType[]
-}
-
-export interface EventsResponse {
-  events: EventItem[];
 }
 
 export const api = {
@@ -157,10 +101,7 @@ export const api = {
       method: "POST",
     }),
 
-  refreshToken: () =>
-    request<AuthResponse>("/api/auth/refresh", {
-      method: "POST",
-    }),
+  refreshToken: () => refreshAccessToken(),
 
   getEvents: (params?: { city?: string }) => {
     const searchParams = new URLSearchParams();
@@ -181,5 +122,45 @@ export const api = {
     request<EventItem & TicketType[]>('/api/event', {
       method: 'POST',
       body: JSON.stringify(payload),
-    })
+    }),
+
+  createOrder: (payload: OrderPayload) =>
+    request<OrderResponse>('/api/order', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  initiatePayment: (orderId: string) => 
+    request<PaymentResponse>('/api/payment', {
+      method: 'POST',
+      body: JSON.stringify({ orderId })
+    }),
+
+  simulatePayment: (payload: PaymentSimulationPayload) =>
+    request<PaymentSimulationResponse>('/api/payment/simulate', {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+
+  verifyPayment: (payload: PaymentVerification) => 
+    request<Tickets>('/api/payment/verify', {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+
+  getMyTickets: () => request<TicketItem[]>('/api/ticket/me'),
+
+  getMe: () => request<{ user: User }>('/api/auth/me'),
+
+  updateProfile: (payload: { name?: string; avatarUrl?: string | null }) =>
+    request<{ message: string; user: User }>('/api/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  updateEvent: (eventId: string, payload: Partial<Omit<EventPayload, 'tickets'>>) =>
+    request<{ message: string; event: EventItem }>(`/api/event/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
 };

@@ -5,11 +5,12 @@ import { Navbar } from "@/components/layout/navbar";
 import { EventCard } from "@/components/events/EventCard";
 import { EventCardSkeleton } from "@/components/events/EventCardSkeleton";
 import { EventDetailsModal } from "@/components/events/EventDetailsModal";
-import { api, type EventItem } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Search, CalendarX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
+import { EventItem } from "@/types";
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = React.useState<string>("");

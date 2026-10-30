@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Navbar } from "@/components/layout/navbar";
+import { LoadingScreen } from "@/components/layout/loading-screen";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth-store";
 
@@ -11,28 +12,19 @@ export default function OrganizerLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [hasHydrated, setHasHydrated] = React.useState(false);
+  const authStatus = useAuthStore((state) => state.authStatus);
 
   React.useEffect(() => {
-    if(useAuthStore.persist.hasHydrated()) {
-      setHasHydrated(true)
+    if (authStatus === "anonymous") {
+      router.replace("/");
     }
-    else {
-      const unsub = useAuthStore.persist.onFinishHydration(() => setHasHydrated(true));
-    return () => unsub();
-    }
-  }, []);
+  }, [authStatus, router]);
 
-  React.useEffect(() => {
-    if(hasHydrated && !isAuthenticated) {
-      router.replace('/')
-    }
-  }, [hasHydrated, isAuthenticated, router])
-
-  if (!hasHydrated || !isAuthenticated) {
-    return null; 
+  if (authStatus === "loading") {
+    return <LoadingScreen />;
   }
+
+  if (authStatus === "anonymous") return null;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">

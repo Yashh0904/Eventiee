@@ -11,7 +11,7 @@ import {
   PlusCircle,
   Compass,
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -23,7 +23,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { cn } from "cn";
 
 export function Navbar() {
-  const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const { user, authStatus, clearAuth } = useAuthStore();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -32,7 +32,8 @@ export function Navbar() {
 
   const router = useRouter();
   const pathname = usePathname();
-
+  
+  const isAuthenticated = authStatus === "authenticated"
   const isExploreActive = pathname === "/";
   const isPassesActive = pathname.startsWith("/tickets");
   const isCreateActive = pathname.startsWith("/organizer");
@@ -52,7 +53,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-3 sm:top-4 z-50 mx-auto w-[calc(100%-2rem)] max-w-6xl transition-all duration-300">
-      <div className="flex h-14 sm:h-16 items-center justify-between rounded-full border border-white/[0.1] bg-white/[0.02] px-5 sm:px-7 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl transition-all dark:border-white/[0.08] dark:bg-purple-900/[0.06]">
+      <div className="flex h-14 sm:h-16 items-center justify-between rounded-full border border-white/10 bg-white/2),0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl transition-all dark:border-white/8 dark:bg-purple-900/6">
         {/* Brand Logo */}
         <Link
           href="/"
@@ -115,6 +116,7 @@ export function Navbar() {
                   className="rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
                 >
                   <Avatar className="size-9 border border-border/80 bg-primary/10 text-primary shadow-sm dark:border-purple-300/30 dark:bg-purple-200 dark:text-purple-950">
+                    {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user?.name} />}
                     <AvatarFallback className="text-xs font-bold bg-primary/15 text-primary dark:bg-purple-200 dark:text-purple-950">
                       {userInitial}
                     </AvatarFallback>
@@ -129,6 +131,7 @@ export function Navbar() {
                   {/* User Profile Header with Avatar */}
                   <div className="flex items-center gap-3 p-2.5">
                     <Avatar className="size-9 shrink-0 border border-border/60 bg-primary/10 text-primary dark:border-purple-300/30 dark:bg-purple-200 dark:text-purple-950">
+                      {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user?.name} />}
                       <AvatarFallback className="text-xs font-bold bg-primary/15 text-primary dark:bg-purple-200 dark:text-purple-950">
                         {userInitial}
                       </AvatarFallback>
@@ -145,9 +148,13 @@ export function Navbar() {
 
                   <DropdownMenuSeparator />
 
-                  <DropdownMenuItem className="rounded-xl px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground cursor-pointer transition-colors">
+                  <DropdownMenuItem
+                    onClick={() => router.push("/profile")}
+                    className="rounded-xl px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground cursor-pointer transition-colors"
+                  >
                     View Profile
                   </DropdownMenuItem>
+
 
                   <DropdownMenuItem
                     onClick={() => router.push("/organizer/events")}

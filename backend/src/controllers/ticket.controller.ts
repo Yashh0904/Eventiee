@@ -170,7 +170,7 @@ export const checkIn = async (req: Request, res: Response) => {
     }
 
     if (ticket.status !== "VALID") {
-      return res.status(400).json({
+      return res.status(409).json({
         message: `Ticket ${ticket.status === "USED" ? `already used at ${ticket.checkedInAt}` : "invalid"}`,
       });
     }

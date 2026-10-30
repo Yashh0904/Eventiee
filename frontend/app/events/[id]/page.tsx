@@ -11,7 +11,6 @@ import {
   Building,
   Sparkles,
   ArrowRight,
-  ShieldCheck,
   Ticket,
   Minus,
   Plus,
@@ -22,8 +21,8 @@ import {
   LogIn,
   UserPlus,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { api, type EventItem } from "@/lib/api";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/auth-store";
 import {
   Dialog,
@@ -31,6 +30,9 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
+import { MockPaymentModal } from "@/components/events/MockPaymentModal";
+import { EventItem } from "@/types";
 
 interface TicketTier {
   id: string;
@@ -44,16 +46,75 @@ export default function EventBookingPage() {
   const params = useParams();
   const router = useRouter();
   const eventId = (params?.id as string) || "";
-  const { isAuthenticated } = useAuthStore();
+  const { authStatus } = useAuthStore();
 
   const [showAuthModal, setShowAuthModal] = React.useState(false);
+  const [openPaymentModal, setOpenPaymentModal] = React.useState(false);
 
-  // Query real event from backend
   const { data, isLoading } = useQuery({
     queryKey: ["event", eventId],
     queryFn: () => api.getEvent(eventId),
     enabled: Boolean(eventId),
   });
+
+  const paymentMutation = useMutation({
+    mutationFn: async () => {
+      const orderResponse = await api.createOrder({
+        eventId,
+        items: Object.entries(quantities).map(([ticketTypeId, quantity]) => ({ticketTypeId, quantity}))
+      });
+
+      const paymentResponse = await api.initiatePayment(orderResponse.id);
+
+      return {
+        order: orderResponse,
+        gateway: paymentResponse
+      }
+    },
+    onSuccess: ({ order, gateway }) => {
+      handleProceedToPayment()
+    },
+    onError: (error) => {
+      toast.add({
+        type: "error", 
+        title: "Failed to reserve tickets",
+        description: "Please try again.",
+      });
+    },
+  })
+
+  const paymentCompletionMutation = useMutation({
+    mutationFn: async () => {
+      if (!paymentMutation.data) {
+        throw new Error("No active order found to process payment.");
+      }
+      const { order, gateway } = paymentMutation.data;
+      
+      const paymentDetails = await api.simulatePayment({ orderId: order.id, gatewayOrderId: gateway.gatewayOrderId, gatewayProvider: gateway.gatewayProvider, amount: order.totalAmount, currency: gateway.currency });
+
+      const paymentVerification = await api.verifyPayment({ orderId: order.id, gatewayOrderId: gateway.gatewayOrderId, providerPaymentId: paymentDetails.paymentId, signature: paymentDetails.signature })
+
+      return { paymentDetails, paymentVerification };
+    },
+    onSuccess: () => {
+      setOpenPaymentModal(false);
+      toast.add({
+        type: "success",
+        title: "Payment Successful!",
+        description: "Your passes are ready. Redirecting to My Passes...",
+      });
+      router.push("/tickets");
+    },
+    onError: (error: any) => {
+      toast.add({
+        type: "error",
+        title: "Payment Verification Failed",
+        description: error?.message || "Could not complete transaction. Please try again.",
+      });
+    }
+  })
+
+  const isAuthenticated = authStatus === "authenticated"
 
   const event: EventItem | undefined = data?.event;
 
@@ -100,12 +161,8 @@ export default function EventBookingPage() {
   const bookingFee = totalTickets > 0 ? 0 : 0; // Free / waived platform fee
   const grandTotal = subtotal + bookingFee;
 
-  const handleProceedToPayment = () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
-    // Authenticated checkout flow to be wired with payment mutation
+  const handleProceedToPayment = () => {  
+    setOpenPaymentModal(true)
   };
 
   // Format date & time
@@ -136,7 +193,7 @@ export default function EventBookingPage() {
           {/* Left Column: Event Overview & Ticket Tier Selection (7 cols) */}
           <div className="lg:col-span-7 space-y-6">
             {/* Event Header Banner Card */}
-            <div className="relative flex flex-col overflow-hidden rounded-3xl border border-border/80 bg-card/60 shadow-lg shadow-black/[0.04] backdrop-blur-xl dark:border-white/[0.08] dark:bg-card/30">
+            <div className="relative flex flex-col overflow-hidden rounded-3xl border border-border/80 bg-card/60 shadow-lg shadow-black/4 backdrop-blur-xl dark:border-white/8 dark:bg-card/30">
               {/* Event Poster / Banner */}
               <div className="relative aspect-16/9 w-full overflow-hidden bg-gradient-to-br from-purple-100 via-violet-50 to-muted/40 dark:from-purple-950/40 dark:via-violet-900/20 dark:to-background">
                 {event?.bannerUrl ? (
@@ -189,7 +246,7 @@ export default function EventBookingPage() {
                 {(formattedDate || event?.venue || event?.city) && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
                     {formattedDate && (
-                      <div className="flex items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/30 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+                      <div className="flex items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/30 p-3.5 dark:border-white/5 dark:bg-white/2">
                         <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                           <Calendar className="size-4" />
                         </div>
@@ -201,7 +258,7 @@ export default function EventBookingPage() {
                     )}
 
                     {(event?.venue || event?.city) && (
-                      <div className="flex items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/30 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+                      <div className="flex items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/30 p-3.5 dark:border-white/5 dark:bg-white/2">
                         <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                           <Building className="size-4" />
                         </div>
@@ -266,8 +323,8 @@ export default function EventBookingPage() {
                         key={tier.id}
                         className={`group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border p-4.5 transition-all duration-200 ${
                           qty > 0
-                            ? "border-primary/60 bg-primary/[0.03] shadow-md shadow-primary/10 dark:border-primary/50 dark:bg-primary/[0.05]"
-                            : "border-border/80 bg-card/60 hover:border-primary/30 dark:border-white/[0.08] dark:bg-card/30"
+                            ? "border-primary/60 bg-primary/3 shadow-md shadow-primary/10 dark:border-primary/50 dark:bg-primary/5"
+                            : "border-border/80 bg-card/60 hover:border-primary/30 dark:border-white/8 dark:bg-card/30"
                         } ${isSoldOut ? "opacity-60 cursor-not-allowed" : ""}`}
                       >
                         {/* Left Tier Meta */}
@@ -277,12 +334,6 @@ export default function EventBookingPage() {
                               {tier.name}
                             </h4>
                           </div>
-
-                          {tier.description && (
-                            <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-                              {tier.description}
-                            </p>
-                          )}
 
                           <div className="flex items-center gap-3 pt-1 text-xs">
                             <span className="font-extrabold text-foreground font-mono text-sm">
@@ -348,7 +399,7 @@ export default function EventBookingPage() {
           {/* Right Column: Order Summary & Checkout (5 cols) */}
           <div className="lg:col-span-5">
             <div className="sticky top-24 space-y-4">
-              <div className="flex flex-col rounded-3xl border border-border/80 bg-card/60 p-6 shadow-xl shadow-black/[0.04] backdrop-blur-xl dark:border-white/[0.08] dark:bg-card/30 space-y-5">
+              <div className="flex flex-col rounded-3xl border border-border/80 bg-card/60 p-6 shadow-xl shadow-black/4backdrop-blur-xl dark:border-white/8 dark:bg-card/30 space-y-5">
                 <div className="flex items-center justify-between border-b border-border/50 pb-4 dark:border-white/5">
                   <div>
                     <h3 className="font-heading text-lg font-bold text-foreground">
@@ -406,7 +457,7 @@ export default function EventBookingPage() {
                     <p className="text-xs font-medium text-muted-foreground">
                       No tickets selected yet
                     </p>
-                    <p className="text-[11px] text-muted-foreground/70 max-w-[200px]">
+                    <p className="text-[11px] text-muted-foreground/70 max-w-50">
                       Choose tier quantities on the left to proceed with checkout.
                     </p>
                   </div>
@@ -417,7 +468,13 @@ export default function EventBookingPage() {
                   <Button
                     size="lg"
                     disabled={totalTickets === 0}
-                    onClick={handleProceedToPayment}
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setShowAuthModal(true);
+                        return;
+                      }  
+                      paymentMutation.mutate()
+                    }}
                     className="w-full rounded-2xl py-3.5 text-sm font-semibold shadow-md shadow-primary/25 cursor-pointer disabled:cursor-not-allowed transition-all duration-200"
                   >
                     <Lock className="size-4 mr-2" />
@@ -444,7 +501,7 @@ export default function EventBookingPage() {
 
       {/* Auth Gate Modal */}
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
-        <DialogContent className="max-w-[360px] sm:max-w-[380px] p-5 sm:p-6">
+        <DialogContent className="max-w-90 sm:max-w-95 p-5 sm:p-6">
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="size-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
               <Lock className="size-5" />
@@ -483,6 +540,16 @@ export default function EventBookingPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <MockPaymentModal
+        open={openPaymentModal}
+        onOpenChange={setOpenPaymentModal}
+        amount={paymentMutation.data?.order.totalAmount}
+        eventName={event?.name}
+        orderId={paymentMutation.data?.order.id}
+        isLoading={paymentCompletionMutation.isPending}
+        onConfirm={() => paymentCompletionMutation.mutate()}
+      />
     </div>
   );
 }

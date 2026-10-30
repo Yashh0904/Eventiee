@@ -1,14 +1,15 @@
 import express from "express"
 import { getMe, tokenRefresh, updateProfile, userLogin, userLogout, userRegistration } from "../controllers/auth.controller.js";
 import { authMiddleWare } from "../middlewares/authMiddleware.js";
+import { loginLimiter, refreshLimiter, registerLimiter } from "../middlewares/rateLimiter.js";
 
 const authRouter = express.Router();
 
-authRouter.post('/register', userRegistration);
+authRouter.post('/register', registerLimiter, userRegistration);
 
-authRouter.post('/login', userLogin);
+authRouter.post('/login', loginLimiter, userLogin);
 
-authRouter.post('/refresh', tokenRefresh);
+authRouter.post('/refresh', refreshLimiter, tokenRefresh);
 
 authRouter.post('/logout', userLogout);
 

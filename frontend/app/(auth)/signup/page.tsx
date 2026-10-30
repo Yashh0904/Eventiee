@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, ApiError, type RegisterPayload } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/auth-store";
 import {
   User,
@@ -26,6 +26,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { RegisterPayload } from "@/types";
 
 export default function SignupPage() {
   const router = useRouter();

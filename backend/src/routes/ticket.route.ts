@@ -5,10 +5,11 @@ import {
   getMyTickets,
   getTicketDetails,
 } from "../controllers/ticket.controller.js";
+import { checkInLimiter } from "../middlewares/rateLimiter.js";
 
 const ticketRouter = express.Router();
 
-ticketRouter.post("/checkin", authMiddleWare, checkIn);
+ticketRouter.post("/checkin", checkInLimiter, authMiddleWare, checkIn);
 
 ticketRouter.get("/me", authMiddleWare, getMyTickets);
 

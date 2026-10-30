@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { type EventItem } from "@/lib/api";
 import { Calendar, MapPin, Sparkles, ArrowRight } from "lucide-react";
+import { EventItem } from "@/types";
 
 interface EventCardProps {
   event: EventItem;
