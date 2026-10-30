@@ -62,7 +62,7 @@ export const orderExpiryWorker = new Worker<OrderExpiryJobData>(
   },
   {
     connection: redis,
-    drainDelay: 60,
+    drainDelay: 120,
     stalledInterval: 300000 
   }
 );
