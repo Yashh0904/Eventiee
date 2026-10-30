@@ -9,6 +9,7 @@ import ticketRouter from "./routes/ticket.route.js";
 import { env } from "./config/env.js";
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(express.json());
 app.use(cors({
     origin: env.FRONTEND_URL,
