@@ -29,17 +29,23 @@ export const orderExpiryWorker = new Worker<OrderExpiryJobData>(
     }
 
     await db.transaction(async (tx) => {
-      const [expiredOrder] = await tx
+      const [order] = await tx
+        .select()
+        .from(orderSchema)
+        .where(eq(orderSchema.id, orderId))
+        .for("update");
+      if (!order || order.status !== "PENDING") {
+        console.log(`[OrderExpiryWorker] Order ${orderId} is not PENDING. Skipping.`);
+        return;
+      }
+
+      await tx
         .update(orderSchema)
         .set({ status: "EXPIRED" })
         .where(and(
           eq(orderSchema.id, orderId),
           eq(orderSchema.status, "PENDING")
         )).returning();
-      
-      if (!expiredOrder) {
-        return; 
-      }
 
       const items = await tx
         .select()

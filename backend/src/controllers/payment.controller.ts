@@ -109,9 +109,10 @@ export const verifyPayment = async (req: Request, res: Response) => {
     }
 
     if (order.status !== "PENDING") {
-      return res.status(400).json({
-        message: "Order has already been completed or cancelled",
-      });
+      return res.status(409).json({
+      message: "Order expired before payment was completed. ;A refund will be processed.",
+      refund: true,
+    })
     }
 
     const verifiedPayment = verifyGatewaySignature(gatewayOrderId, providerPaymentId, signature);
@@ -130,10 +131,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
       return res.status(400).json({
         message: "Payment verification failed",
       });
-    }
-
-    const issuedTickets = await db.transaction(async (tx) => {
-      await tx.insert(paymentSchema).values({
+    } else {
+      await db.insert(paymentSchema).values({
         orderId,
         amount: order.totalAmount,
         currency: "INR",
@@ -142,7 +141,9 @@ export const verifyPayment = async (req: Request, res: Response) => {
         providerPaymentId,
         providerOrderId: gatewayOrderId,
       });
+    }
 
+    const issuedTickets = await db.transaction(async (tx) => {
       const [ completedOrder ] = await tx
         .update(orderSchema)
         .set({ status: "COMPLETED" })
@@ -152,7 +153,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         )).returning();
 
       if (!completedOrder) {
-        throw new Error("Order has expired or has already been completed");
+        return null;
       }
 
       const items = await tx
@@ -178,6 +179,13 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
       return await tx.insert(ticketSchema).values(tickets).returning();
     });
+
+    if (!issuedTickets) {
+      return res.status(409).json({
+        message: "Order expired before payment was completed. A refund will be initiated.",
+        refund: true,
+      });
+    }
 
     const firstTicket = issuedTickets[0];
     if (!firstTicket) {

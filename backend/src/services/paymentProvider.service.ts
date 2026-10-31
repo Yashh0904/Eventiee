@@ -52,5 +52,11 @@ export const verifyGatewaySignature = (gatewayOrderId: string, providerPaymentId
     .update(`${gatewayOrderId}|${providerPaymentId}`)
     .digest('hex');
   
-  return signature === signatureCheck
+  const sigBuf = Buffer.from(signature);
+  const checkBuf = Buffer.from(signatureCheck);
+  
+  if (sigBuf.length !== checkBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(sigBuf, checkBuf);
 }
