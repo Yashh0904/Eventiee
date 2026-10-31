@@ -3,10 +3,11 @@ import crypto from "node:crypto"
 import { paymentInitiationSchema, paymentSimulationSchema, paymentVerificationSchema } from "../schema/payment.schema.js";
 import { flattenError } from "zod/v4/core";
 import { db } from "../db/index.js";
-import { orderItemSchema, orderSchema, paymentSchema, ticketSchema } from "../db/schema.js";
+import { eventSchema, orderItemSchema, orderSchema, paymentSchema, ticketSchema, ticketTypeSchema } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
 import { createGatewayOrder, providerPayment, verifyGatewaySignature } from "../services/paymentProvider.service.js";
 import { nanoid } from "nanoid";
+import { emailQueue } from "../queues/email.queue.js";
 
 export const initiatePayment = async (req: Request, res: Response) => {
   try {
@@ -177,6 +178,42 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
       return await tx.insert(ticketSchema).values(tickets).returning();
     });
+
+    const firstTicket = issuedTickets[0];
+    if (!firstTicket) {
+      throw new Error("Failed to issue tickets");
+    }
+
+    const [ event ] = await db
+      .select()
+      .from(eventSchema)
+      .where(eq(eventSchema.id, firstTicket.eventId));
+
+    if(!event) {
+      throw new Error("Invalid Event");
+    }
+
+    const emailTickets = issuedTickets.map((ticket) => ({
+      shortId: ticket.shortId,
+      qrToken: ticket.qrToken,
+    }))
+
+    await emailQueue.add('send-email',
+      {
+        type: "ticket",
+        userEmail: user.email,
+        userName:user.name,
+        eventName: event.name,
+        venue: event.venue,
+        dateTime: event.dateTime.toDateString(),
+        tickets: emailTickets
+      },
+      {
+        jobId: `welcome-email-${order.id}`,
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      }
+    )
 
     return res.status(200).json({
       tickets: issuedTickets,

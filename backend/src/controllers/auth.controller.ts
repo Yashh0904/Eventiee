@@ -11,6 +11,7 @@ import { redis } from "../lib/redis.js";
 import type { SafeUser } from "../types/express.js";
 import { env } from "../config/env.js";
 import jwt, { type JwtPayload } from "jsonwebtoken"
+import { emailQueue } from "../queues/email.queue.js";
 
 type RefreshResult =
   | {
@@ -88,6 +89,15 @@ export const userRegistration = async (req: Request, res: Response) => {
       path: '/api/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
+    await emailQueue.add("send-email",
+      { type: "welcome", userEmail: user.email, userName: user.name },
+      {
+        jobId: `welcome-email-${user.id}`,
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      }
+    )
 
     return res.status(201).json({
       accessToken,

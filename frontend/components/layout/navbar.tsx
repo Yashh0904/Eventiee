@@ -53,7 +53,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-3 sm:top-4 z-50 mx-auto w-[calc(100%-2rem)] max-w-6xl transition-all duration-300">
-      <div className="flex h-14 sm:h-16 items-center justify-between rounded-full border border-white/10 bg-white/2),0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl transition-all dark:border-white/8 dark:bg-purple-900/6">
+      <div className="flex h-14 sm:h-16 items-center justify-between rounded-full border border-white/10 bg-white/[0.02] px-5 sm:px-7 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl transition-all dark:border-white/[0.08] dark:bg-purple-900/[0.06]">
         {/* Brand Logo */}
         <Link
           href="/"

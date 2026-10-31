@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import app from './app.js'
 import './workers/orderExpiry.worker.js'
+import './workers/email.worker.js'
 import { env } from './config/env.js'
 
 async function startServer() {
