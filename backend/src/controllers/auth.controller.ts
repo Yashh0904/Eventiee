@@ -85,7 +85,7 @@ export const userRegistration = async (req: Request, res: Response) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       path: '/api/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -167,7 +167,7 @@ export const userLogin = async (req: Request, res: Response) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       path: '/api/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -272,7 +272,12 @@ export const tokenRefresh = async (req: Request, res: Response) => {
     });
     
     if (txn.kind === "replay") {
-      res.clearCookie("refreshToken");
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: env.NODE_ENV === "production",
+        sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+        path: '/api/auth',
+      });
       return res.status(403).json({
         message: "Session already used. Please log in again.",
       });
@@ -281,7 +286,7 @@ export const tokenRefresh = async (req: Request, res: Response) => {
     res.cookie("refreshToken", txn.newRefreshToken, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       path: '/api/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -332,7 +337,7 @@ export const userLogout = async (req: Request, res: Response) => {
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: env.NODE_ENV === "production",
-        sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: env.NODE_ENV === "production" ? "none" : "lax",
         path: '/api/auth',
       });
     }
